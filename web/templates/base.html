@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}카카오채팅 요약{% endblock %}</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['"Noto Sans KR"', 'sans-serif'] } } }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+
+  <style>
+    body { font-family: 'Noto Sans KR', sans-serif; background-color: #FAFAF7; }
+    .htmx-indicator { opacity: 0; transition: opacity 200ms; }
+    .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+
+    /* Markdown prose */
+    .md-prose { line-height: 1.8; color: #374151; font-size: 0.875rem; }
+    .md-prose h1 { font-size: 1.35rem; font-weight: 700; margin: 1.5rem 0 0.75rem; color: #111827; }
+    .md-prose h2 { font-size: 1.1rem; font-weight: 700; margin: 1.25rem 0 0.5rem;
+                   padding-bottom: 0.3rem; border-bottom: 2px solid #FEE500; color: #1f2937; }
+    .md-prose h3 { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.4rem; color: #374151; }
+    .md-prose p { margin-bottom: 0.6rem; }
+    .md-prose ul { list-style: disc; padding-left: 1.4rem; margin-bottom: 0.65rem; }
+    .md-prose ol { list-style: decimal; padding-left: 1.4rem; margin-bottom: 0.65rem; }
+    .md-prose li { margin-bottom: 0.2rem; }
+    .md-prose a { color: #D97706; text-decoration: underline; word-break: break-all; }
+    .md-prose a:hover { color: #92400E; }
+    .md-prose code { font-family: monospace; font-size: 0.82em; background: #F3F4F6;
+                     padding: 0.1em 0.35em; border-radius: 4px; }
+    .md-prose pre { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px;
+                    padding: 1rem; overflow-x: auto; margin-bottom: 0.75rem; }
+    .md-prose pre code { background: none; padding: 0; }
+    .md-prose blockquote { border-left: 3px solid #FEE500; padding-left: 1rem;
+                           color: #6B7280; margin: 0.75rem 0; }
+    .md-prose strong { font-weight: 600; color: #1f2937; }
+    .md-prose hr { border: none; border-top: 1px solid #E5E7EB; margin: 1rem 0; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.8s linear infinite; }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #F3F4F6; }
+    ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Navigation -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2.5 group">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-gray-900 text-sm
+                    group-hover:scale-105 transition-transform" style="background:#FEE500;">카</div>
+        <span class="font-bold text-gray-900 text-[15px] tracking-tight">카카오채팅 요약</span>
+      </a>
+      <nav class="flex items-center gap-1">
+        <a href="/" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors font-medium">홈</a>
+        <a href="/settings" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors font-medium">설정</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Flash area -->
+  <div id="flash-area" class="max-w-5xl mx-auto px-4 sm:px-6 pt-3 space-y-2" aria-live="polite"></div>
+
+  <!-- Main -->
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 py-6 pb-16">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    marked.setOptions({ breaks: true, gfm: true });
+
+    function showFlash(msg, type) {
+      type = type || 'info';
+      const styles = {
+        error:   'bg-red-50 border-red-200 text-red-700',
+        success: 'bg-green-50 border-green-200 text-green-700',
+        info:    'bg-blue-50 border-blue-200 text-blue-700',
+        warning: 'bg-amber-50 border-amber-200 text-amber-700',
+      };
+      const area = document.getElementById('flash-area');
+      if (!area) return;
+      const el = document.createElement('div');
+      el.className = 'border rounded-xl px-4 py-3 text-sm flex items-start justify-between gap-3 ' + (styles[type] || styles.info);
+      el.innerHTML = '<span class="flex-1">' + msg + '</span>' +
+        '<button onclick="this.parentElement.remove()" class="opacity-50 hover:opacity-100 flex-shrink-0 text-base leading-none">×</button>';
+      area.appendChild(el);
+      setTimeout(function() { el && el.remove(); }, 6000);
+    }
+
+    document.body.addEventListener('htmx:responseError', function(evt) {
+      var msg = '오류가 발생했습니다.';
+      try { var d = JSON.parse(evt.detail.xhr.responseText); msg = d.detail || d.message || msg; } catch(e) {}
+      showFlash(msg, 'error');
+    });
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

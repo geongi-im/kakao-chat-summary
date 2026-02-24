@@ -1,0 +1,618 @@
+{% extends "base.html" %}
+{% block title %}{{ room.name }} · 카카오채팅 요약{% endblock %}
+
+{% block content %}
+{% set total_days = dates_info|length %}
+{% set summarized_days = dates_info|selectattr('has_summary')|list|length %}
+{% set total_msg = stats.get('total_messages', 0) if stats else 0 %}
+{% set senders = stats.get('unique_senders', 0) if stats else 0 %}
+{% set first_d = stats.get('first_date') if stats else None %}
+{% set last_d = stats.get('last_date') if stats else None %}
+
+<!-- Breadcrumb & Header -->
+<div class="mb-5">
+  <div class="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
+    <a href="/" class="hover:text-gray-700 transition-colors">홈</a>
+    <span>/</span>
+    <span class="text-gray-600 font-medium truncate max-w-xs">{{ room.name }}</span>
+  </div>
+  <div class="flex items-start justify-between gap-4">
+    <h1 class="text-2xl font-bold text-gray-900 leading-tight">{{ room.name }}</h1>
+    <a href="/"
+      class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+      ← 목록
+    </a>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3">
+    <div class="flex items-center gap-1.5 text-sm">
+      <span class="text-gray-400">💬</span>
+      <span class="font-semibold text-gray-900 tabular-nums">{{ "{:,}".format(total_msg) }}</span>
+      <span class="text-gray-400 text-xs">메시지</span>
+    </div>
+    <div class="flex items-center gap-1.5 text-sm">
+      <span class="text-gray-400">👥</span>
+      <span class="font-semibold text-gray-900">{{ senders }}</span>
+      <span class="text-gray-400 text-xs">참여자</span>
+    </div>
+    {% if first_d and last_d %}
+    <div class="flex items-center gap-1.5 text-sm">
+      <span class="text-gray-400">📅</span>
+      <span class="text-gray-600 text-xs">{{ first_d }} – {{ last_d }}</span>
+    </div>
+    {% endif %}
+    <div class="flex items-center gap-1.5 text-sm">
+      <span class="text-gray-400">📝</span>
+      <span class="font-semibold text-gray-900">{{ summarized_days }}/{{ total_days }}</span>
+      <span class="text-gray-400 text-xs">일 요약</span>
+      {% if total_days > 0 %}
+      <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div class="h-full rounded-full" style="width:{{ (summarized_days / total_days * 100)|round }}%; background:#FEE500;"></div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Tab Panel -->
+<div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+  <!-- Tab Navigation -->
+  <div class="border-b border-gray-200 flex overflow-x-auto" role="tablist">
+    {% for tab_id, label in [('dashboard','📊 대시보드'), ('summaries','📅 날짜별 요약'), ('urls','🔗 URL 목록'), ('generate','⚙️ 요약 생성')] %}
+    <button role="tab"
+      data-tab="{{ tab_id }}"
+      onclick="switchTab('{{ tab_id }}')"
+      class="tab-btn flex-shrink-0 px-5 py-3.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
+             {% if loop.first %}border-yellow-400 text-gray-900{% else %}border-transparent text-gray-400 hover:text-gray-700{% endif %}">
+      {{ label }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- ── Tab: 대시보드 ── -->
+  <div id="panel-dashboard" class="tab-panel p-6">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div class="bg-gray-50 rounded-2xl p-4 text-center">
+        <div class="text-2xl mb-1">💬</div>
+        <div class="text-xl font-bold text-gray-900 tabular-nums">{{ "{:,}".format(total_msg) }}</div>
+        <div class="text-xs text-gray-400 mt-0.5">전체 메시지</div>
+      </div>
+      <div class="bg-gray-50 rounded-2xl p-4 text-center">
+        <div class="text-2xl mb-1">👥</div>
+        <div class="text-xl font-bold text-gray-900">{{ senders }}</div>
+        <div class="text-xs text-gray-400 mt-0.5">참여자</div>
+      </div>
+      <div class="bg-gray-50 rounded-2xl p-4 text-center">
+        <div class="text-2xl mb-1">📅</div>
+        <div class="text-xl font-bold text-gray-900">{{ total_days }}</div>
+        <div class="text-xs text-gray-400 mt-0.5">데이터 일수</div>
+      </div>
+      <div class="bg-gray-50 rounded-2xl p-4 text-center">
+        <div class="text-2xl mb-1">📝</div>
+        <div class="text-xl font-bold text-gray-900">{{ summarized_days }}/{{ total_days }}</div>
+        <div class="text-xs text-gray-400 mt-0.5">요약 완료</div>
+      </div>
+    </div>
+
+    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">최근 요약</h3>
+    {% if recent_summaries %}
+    <div class="space-y-1.5">
+      {% for s in recent_summaries %}
+      <button
+        onclick="switchTab('summaries'); loadSummary({{ room.id }}, '{{ s.summary_date }}')"
+        class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-yellow-50 rounded-xl transition-colors text-left group">
+        <div class="flex items-center gap-3">
+          <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:#FEE500;"></span>
+          <span class="text-sm font-medium text-gray-900">{{ s.summary_date }}</span>
+          {% if s.llm_provider %}
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ s.llm_provider }}</span>
+          {% endif %}
+        </div>
+        <span class="text-gray-300 group-hover:text-gray-500 transition-colors">→</span>
+      </button>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-10 bg-gray-50 rounded-2xl">
+      <p class="text-sm text-gray-400 mb-3">요약이 없습니다</p>
+      <button onclick="switchTab('generate')"
+        class="text-xs font-semibold px-4 py-2 rounded-lg text-gray-900 shadow-sm" style="background:#FEE500;">
+        요약 생성하러 가기
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Tab: 날짜별 요약 ── -->
+  <div id="panel-summaries" class="tab-panel hidden">
+
+    <!-- 모바일 전용: 날짜 select (sm 이상에서 숨김) -->
+    <div class="sm:hidden border-b border-gray-100 px-3 py-2">
+      <select id="date-select-mobile"
+        onchange="if(this.value) loadSummary({{ room.id }}, this.value)"
+        class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm
+               focus:outline-none focus:ring-2 focus:ring-yellow-300">
+        <option value="">날짜 선택...</option>
+        {% for item in dates_info %}
+        <option id="date-opt-{{ item.date }}" value="{{ item.date }}">
+          {{ item.date }}{% if item.has_summary %} {% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="flex" style="height: max(520px, calc(100vh - 280px));">
+
+      <!-- 데스크탑 전용 사이드바 (모바일에서 숨김) -->
+      <div class="hidden sm:block w-44 flex-shrink-0 border-r border-gray-100 overflow-y-auto">
+        {% if dates_info %}
+        {% for item in dates_info %}
+        <button id="date-btn-{{ item.date }}"
+          onclick="loadSummary({{ room.id }}, '{{ item.date }}')"
+          class="w-full text-left px-3 py-3 border-b border-gray-50 hover:bg-yellow-50 transition-colors">
+          <div class="text-xs font-medium tabular-nums
+                      {% if item.has_summary %}text-gray-800{% else %}text-gray-400{% endif %}">
+            {{ item.date }}
+          </div>
+          <div id="date-status-{{ item.date }}"
+               class="text-[10px] mt-0.5 {% if item.has_summary %}text-green-600{% else %}text-gray-300{% endif %}">
+            {% if item.has_summary %} 요약{% else %}○ 없음{% endif %}
+          </div>
+        </button>
+        {% endfor %}
+        {% else %}
+        <div class="p-4 text-xs text-gray-400 text-center leading-relaxed">
+          데이터 없음.<br>파일을 업로드하세요.
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- 콘텐츠 영역 (모바일에서 전체 너비) -->
+      <div class="flex-1 overflow-y-auto min-w-0">
+        <!-- 툴바: 날짜 배지 + 읽음 토글 버튼 -->
+        <div class="sticky top-0 bg-white border-b border-gray-100 px-4 py-2 min-h-[44px] flex items-center justify-between gap-2">
+          <span id="summary-date-badge" class="text-xs text-gray-400 flex-shrink-0">날짜를 선택하세요</span>
+          <button id="read-toggle-btn"
+            onclick="toggleRead()"
+            class="hidden flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium">
+          </button>
+        </div>
+        <div id="summary-content" class="px-4 sm:px-5 py-4 md-prose">
+          <div class="text-center py-16 text-gray-300">
+            <div class="text-5xl mb-3">📄</div>
+            <p class="text-sm">날짜를 선택하면<br>요약 내용이 표시됩니다</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tab: URL 목록 ── -->
+  <div id="panel-urls" class="tab-panel hidden p-6">
+    <div class="flex gap-2 mb-5">
+      {% for lt, label in [('recent','🔥 최근 3일'), ('weekly','📅 주간'), ('all','📚 전체')] %}
+      <button data-url-type="{{ lt }}" onclick="loadUrls({{ room.id }}, '{{ lt }}')"
+        class="url-tab-btn px-3.5 py-1.5 text-xs font-semibold rounded-full border transition-all
+               {% if lt == 'all' %}border-yellow-400 text-gray-900{% else %}border-gray-200 text-gray-500 hover:border-gray-300{% endif %}"
+        {% if lt == 'all' %}style="background:#FEE500;"{% endif %}>
+        {{ label }}
+      </button>
+      {% endfor %}
+    </div>
+
+    <div id="url-list-container" class="min-h-32">
+      <div class="text-center py-10 text-gray-300 text-sm">
+        <div class="text-3xl mb-2">🔗</div>
+        <p>탭을 선택하면 URL이 표시됩니다</p>
+      </div>
+    </div>
+
+    <div class="mt-5 pt-4 border-t border-gray-100 flex items-center gap-3">
+      <button onclick="syncUrls({{ room.id }})" id="sync-url-btn"
+        class="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-50 hover:bg-yellow-50 text-gray-700 text-xs font-semibold
+               rounded-xl border border-gray-200 hover:border-yellow-300 transition-all">
+        🔄 요약에서 URL 동기화
+      </button>
+      <span id="sync-url-status" class="text-xs text-gray-400"></span>
+    </div>
+  </div>
+
+  <!-- ── Tab: 요약 생성 ── -->
+  <div id="panel-generate" class="tab-panel hidden p-6">
+    <!-- Progress area -->
+    <div id="summary-progress-area" class="hidden mb-6">
+      <div class="rounded-2xl p-5 border" style="background:#FFFBEB; border-color:#FDE68A;">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 border-2 border-yellow-300 border-t-yellow-500 rounded-full spin"></div>
+            <span id="progress-title" class="text-sm font-semibold text-gray-800">요약 진행 중...</span>
+          </div>
+          <button onclick="cancelSummarize({{ room.id }})"
+            class="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-3 py-1 transition-colors font-medium">
+            취소
+          </button>
+        </div>
+        <div class="w-full bg-yellow-100 rounded-full h-2 mb-2 overflow-hidden">
+          <div id="progress-bar" class="h-full rounded-full transition-all duration-700" style="width:0%; background:#FEE500;"></div>
+        </div>
+        <p id="progress-detail" class="text-xs text-gray-500">준비 중...</p>
+      </div>
+    </div>
+
+    <!-- Generation form -->
+    <h3 class="text-sm font-semibold text-gray-700 mb-4">🤖 LLM 요약 생성</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1.5">LLM 제공자</label>
+        <select id="llm-provider"
+          class="w-full border border-gray-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:bg-white transition-colors">
+          <option value="glm">Z.AI GLM</option>
+          <option value="chatgpt">OpenAI ChatGPT</option>
+          <option value="minimax">MiniMax</option>
+          <option value="perplexity">Perplexity</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1.5">날짜 범위</label>
+        <select id="date-range"
+          class="w-full border border-gray-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:bg-white transition-colors">
+          <option value="pending">요약 필요한 날짜만</option>
+          <option value="today">오늘</option>
+          <option value="yesterday">어제~오늘</option>
+          <option value="2days">엇그제~오늘</option>
+          <option value="all">전체 날짜</option>
+        </select>
+      </div>
+    </div>
+
+    <label class="flex items-center gap-2 mb-5 cursor-pointer w-fit">
+      <input type="checkbox" id="skip-existing" checked
+        class="w-4 h-4 rounded border-gray-300 accent-yellow-400 cursor-pointer">
+      <span class="text-sm text-gray-600">이미 요약된 날짜 건너뛰기</span>
+    </label>
+
+    <button id="start-summarize-btn"
+      onclick="startSummarize({{ room.id }})"
+      class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-gray-900
+             shadow-sm hover:shadow-md active:scale-95 transition-all" style="background:#FEE500;">
+      ⚡ 요약 시작
+    </button>
+
+    <!-- File upload in generate tab -->
+    <div class="mt-8 pt-6 border-t border-gray-100">
+      <h3 class="text-sm font-semibold text-gray-700 mb-4">📤 파일 업로드</h3>
+      <form hx-post="/api/upload" hx-encoding="multipart/form-data"
+            hx-on::after-request="onRoomFileUpload(event)">
+        <input type="hidden" name="room_name" value="{{ room.name }}">
+        <input type="hidden" name="create_room" value="true">
+        <div class="flex items-end gap-3">
+          <div class="flex-1">
+            <input name="file" type="file" accept=".txt" required
+              class="w-full text-sm text-gray-600 cursor-pointer
+                     file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0
+                     file:text-xs file:font-semibold file:bg-yellow-50 file:text-gray-700 hover:file:bg-yellow-100">
+            <p class="text-xs text-gray-400 mt-1">카카오톡 내보내기 .txt 파일</p>
+          </div>
+          <button type="submit"
+            class="flex-shrink-0 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-xl transition-colors">
+            업로드
+          </button>
+        </div>
+      </form>
+      <div id="room-upload-result" class="mt-3"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var ROOM_ID = {{ room.id }};
+  var statusPoll = null;
+
+  // ── 읽음 상태 관리 (localStorage, 수동 토글) ──────────────
+  var READ_KEY = 'kakao_read_' + ROOM_ID;
+  var currentDate = null;  // 현재 열려있는 날짜
+
+  function getReadDates() {
+    try { return JSON.parse(localStorage.getItem(READ_KEY) || '[]'); } catch(e) { return []; }
+  }
+
+  function isRead(dateStr) {
+    return getReadDates().indexOf(dateStr) !== -1;
+  }
+
+  function setRead(dateStr, read) {
+    var dates = getReadDates();
+    var idx = dates.indexOf(dateStr);
+    if (read && idx === -1) dates.push(dateStr);
+    if (!read && idx !== -1) dates.splice(idx, 1);
+    localStorage.setItem(READ_KEY, JSON.stringify(dates));
+    applyReadStyle(dateStr, read);
+    updateReadToggleBtn(dateStr);
+  }
+
+  function toggleRead() {
+    if (!currentDate) return;
+    setRead(currentDate, !isRead(currentDate));
+  }
+
+  function applyReadStyle(dateStr, read) {
+    // 데스크탑 사이드바 버튼
+    var btn = document.getElementById('date-btn-' + dateStr);
+    var statusEl = document.getElementById('date-status-' + dateStr);
+    if (statusEl) {
+      if (read) {
+        statusEl.innerHTML = '✓ 읽음';
+        statusEl.className = 'text-[10px] mt-0.5 text-gray-400';
+      } else {
+        statusEl.innerHTML = '✓ 요약';
+        statusEl.className = 'text-[10px] mt-0.5 text-green-600';
+      }
+    }
+    if (btn) btn.style.opacity = read ? '0.55' : '';
+
+    // 모바일 select option
+    var opt = document.getElementById('date-opt-' + dateStr);
+    if (opt) {
+      // 최초 1회 원본 텍스트 저장
+      if (!opt.dataset.base) opt.dataset.base = opt.textContent.trim();
+      opt.textContent = read ? opt.dataset.base + ' (read)' : opt.dataset.base;
+    }
+  }
+
+  function updateReadToggleBtn(dateStr) {
+    var btn = document.getElementById('read-toggle-btn');
+    if (!btn || !dateStr) return;
+    var read = isRead(dateStr);
+    btn.textContent = read ? '읽음 취소' : '읽음 표시';
+    btn.className = read
+      ? 'flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium border-gray-300 text-gray-400 hover:border-red-300 hover:text-red-400'
+      : 'flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium border-green-300 text-green-600 hover:bg-green-50';
+  }
+
+  function initReadStates() {
+    getReadDates().forEach(function(d) { applyReadStyle(d, true); });
+  }
+
+  // Tab switching
+  function switchTab(tabId) {
+    ['dashboard', 'summaries', 'urls', 'generate'].forEach(function(id) {
+      var panel = document.getElementById('panel-' + id);
+      if (panel) panel.classList.toggle('hidden', id !== tabId);
+    });
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+      var isActive = btn.dataset.tab === tabId;
+      btn.classList.toggle('border-yellow-400', isActive);
+      btn.classList.toggle('text-gray-900', isActive);
+      btn.classList.toggle('border-transparent', !isActive);
+      btn.classList.toggle('text-gray-400', !isActive);
+    });
+    if (tabId === 'urls') loadUrls(ROOM_ID, 'all');
+  }
+
+  // Load summary content
+  async function loadSummary(roomId, dateStr) {
+    currentDate = dateStr;
+
+    // 데스크탑 사이드바 선택 표시
+    document.querySelectorAll('[id^="date-btn-"]').forEach(function(b) {
+      b.classList.remove('bg-yellow-50');
+      b.style.borderRight = '';
+    });
+    var sideBtn = document.getElementById('date-btn-' + dateStr);
+    if (sideBtn) { sideBtn.classList.add('bg-yellow-50'); sideBtn.style.borderRight = '2px solid #FEE500'; }
+
+    // 모바일 select 동기화
+    var mobileSelect = document.getElementById('date-select-mobile');
+    if (mobileSelect) mobileSelect.value = dateStr;
+
+    // 날짜 배지
+    var badge = document.getElementById('summary-date-badge');
+    badge.textContent = dateStr;
+    badge.className = 'text-xs font-mono bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full flex-shrink-0';
+
+    // 읽음 토글 버튼 숨김 (로딩 중)
+    var readBtn = document.getElementById('read-toggle-btn');
+    if (readBtn) readBtn.classList.add('hidden');
+
+    var content = document.getElementById('summary-content');
+    content.innerHTML = '<div class="flex items-center gap-2 py-16 justify-center text-gray-300">' +
+      '<div class="w-5 h-5 border-2 border-gray-200 border-t-yellow-400 rounded-full spin"></div>' +
+      '<span class="text-sm">불러오는 중...</span></div>';
+
+    try {
+      var res = await fetch('/api/rooms/' + roomId + '/summaries/' + dateStr);
+      if (!res.ok) {
+        content.innerHTML = '<div class="text-center py-16">' +
+          '<div class="text-4xl mb-3">📭</div>' +
+          '<p class="text-sm text-gray-400">해당 날짜의 요약이 없습니다</p>' +
+          '<button onclick="switchTab(\'generate\')" class="mt-4 text-xs font-semibold px-4 py-2 rounded-lg text-gray-900" style="background:#FEE500;">요약 생성</button>' +
+          '</div>';
+        return;
+      }
+      var data = await res.json();
+      content.innerHTML = marked.parse(data.content || '');
+      // 읽음 버튼 표시
+      if (readBtn) {
+        readBtn.classList.remove('hidden');
+        updateReadToggleBtn(dateStr);
+      }
+    } catch(e) {
+      content.innerHTML = '<p class="text-red-400 text-sm py-8 text-center">오류가 발생했습니다.</p>';
+    }
+  }
+
+  // Load URLs
+  async function loadUrls(roomId, listType) {
+    document.querySelectorAll('.url-tab-btn').forEach(function(b) {
+      var isActive = b.dataset.urlType === listType;
+      b.style.background = isActive ? '#FEE500' : '';
+      b.classList.toggle('border-yellow-400', isActive);
+      b.classList.toggle('text-gray-900', isActive);
+      b.classList.toggle('border-gray-200', !isActive);
+      b.classList.toggle('text-gray-500', !isActive);
+    });
+
+    var container = document.getElementById('url-list-container');
+    container.innerHTML = '<div class="flex items-center gap-2 py-8 justify-center text-gray-300">' +
+      '<div class="w-4 h-4 border-2 border-gray-200 border-t-yellow-400 rounded-full spin"></div>' +
+      '<span class="text-sm">로딩 중...</span></div>';
+
+    try {
+      var res = await fetch('/api/rooms/' + roomId + '/urls?list_type=' + listType);
+      var data = await res.json();
+      if (!data.urls || data.urls.length === 0) {
+        container.innerHTML = '<div class="text-center py-10 text-gray-300">' +
+          '<div class="text-4xl mb-2">🔗</div>' +
+          '<p class="text-sm">URL이 없습니다. "URL 동기화"를 실행해보세요</p></div>';
+        return;
+      }
+      container.innerHTML = data.urls.map(function(item, i) {
+        return '<div class="flex flex-col gap-0.5 py-3 border-b border-gray-50 last:border-0">' +
+          '<div class="flex items-start gap-2">' +
+          '<span class="text-xs text-gray-300 tabular-nums mt-0.5 w-6 text-right flex-shrink-0">' + (i+1) + '</span>' +
+          '<div class="flex-1 min-w-0">' +
+          '<a href="' + item.url + '" target="_blank" rel="noopener noreferrer" ' +
+          'class="text-sm text-blue-600 hover:text-blue-800 hover:underline break-all">' + item.url + '</a>' +
+          (item.descriptions.length ? '<p class="text-xs text-gray-400 mt-0.5">' + item.descriptions.join(' / ') + '</p>' : '') +
+          '</div></div></div>';
+      }).join('');
+    } catch(e) {
+      container.innerHTML = '<p class="text-red-400 text-sm py-8 text-center">오류가 발생했습니다.</p>';
+    }
+  }
+
+  async function syncUrls(roomId) {
+    var btn = document.getElementById('sync-url-btn');
+    var status = document.getElementById('sync-url-status');
+    btn.disabled = true;
+    btn.classList.add('opacity-50');
+    status.textContent = '동기화 중...';
+    try {
+      var res = await fetch('/api/rooms/' + roomId + '/urls/sync', { method: 'POST' });
+      var data = await res.json();
+      if (res.ok) {
+        status.textContent = '완료: ' + data.total + '개';
+        showFlash('URL 동기화 완료: ' + data.total + '개', 'success');
+        loadUrls(roomId, 'all');
+      } else {
+        status.textContent = '실패';
+        showFlash(data.detail || 'URL 동기화 실패', 'error');
+      }
+    } catch(e) { status.textContent = '오류 발생'; }
+    finally { btn.disabled = false; btn.classList.remove('opacity-50'); }
+  }
+
+  // Summary generation
+  async function startSummarize(roomId) {
+    var provider  = document.getElementById('llm-provider').value;
+    var dateRange = document.getElementById('date-range').value;
+    var skipExist = document.getElementById('skip-existing').checked;
+    var btn = document.getElementById('start-summarize-btn');
+    btn.disabled = true; btn.classList.add('opacity-60');
+
+    try {
+      var res = await fetch('/api/rooms/' + roomId + '/summarize', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ provider: provider, date_range: dateRange, skip_existing: skipExist }),
+      });
+      var data = await res.json();
+      if (!res.ok) { showFlash(data.detail || '요약 시작 실패', 'error'); btn.disabled = false; btn.classList.remove('opacity-60'); return; }
+      if (data.status === 'skipped') { showFlash(data.message || '요약할 날짜가 없습니다', 'info'); btn.disabled = false; btn.classList.remove('opacity-60'); return; }
+
+      showProgressArea(true);
+      document.getElementById('progress-detail').textContent = data.total + '일 대상으로 시작';
+      startPolling(roomId);
+    } catch(e) {
+      showFlash('요약 시작 중 오류가 발생했습니다', 'error');
+      btn.disabled = false; btn.classList.remove('opacity-60');
+    }
+  }
+
+  async function cancelSummarize(roomId) {
+    try {
+      var res = await fetch('/api/rooms/' + roomId + '/summarize', { method: 'DELETE' });
+      if (res.ok) showFlash('취소 요청이 전달되었습니다', 'info');
+    } catch(e) {}
+  }
+
+  function showProgressArea(show) {
+    document.getElementById('summary-progress-area').classList.toggle('hidden', !show);
+    var btn = document.getElementById('start-summarize-btn');
+    btn.disabled = show; btn.classList.toggle('opacity-60', show);
+  }
+
+  function startPolling(roomId) {
+    if (statusPoll) clearInterval(statusPoll);
+    pollStatus(roomId);
+    statusPoll = setInterval(function() { pollStatus(roomId); }, 3000);
+  }
+
+  async function pollStatus(roomId) {
+    try {
+      var res = await fetch('/api/rooms/' + roomId + '/summarize/status');
+      var data = await res.json();
+      updateProgressUI(data);
+      if (data.status !== 'running') {
+        clearInterval(statusPoll); statusPoll = null;
+        showProgressArea(false);
+        if (data.status === 'completed') {
+          showFlash('요약 완료! 🎉', 'success');
+          setTimeout(function() { location.reload(); }, 1200);
+        } else if (data.status === 'failed') {
+          showFlash('요약 실패: ' + (data.error || '알 수 없는 오류'), 'error');
+        } else if (data.status === 'cancelled') {
+          showFlash('요약이 취소되었습니다', 'warning');
+        }
+      }
+    } catch(e) { clearInterval(statusPoll); }
+  }
+
+  function updateProgressUI(data) {
+    var pct = data.total > 0 ? Math.round((data.current || 0) / data.total * 100) : 0;
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('progress-title').textContent =
+      data.status === 'running' ? '요약 진행 중... (' + (data.current||0) + '/' + (data.total||0) + '일)' : '처리 완료';
+    document.getElementById('progress-detail').textContent =
+      data.current_date ? '현재 처리: ' + data.current_date : '';
+  }
+
+  function onRoomFileUpload(evt) {
+    var result = document.getElementById('room-upload-result');
+    if (evt.detail.successful) {
+      var d = JSON.parse(evt.detail.xhr.responseText);
+      result.innerHTML = '<div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm">' +
+        '✅ ' + d.dates_processed + '일 저장됨 · 새 메시지 ' + d.new_messages + '개' +
+        (d.invalidated_summaries > 0 ? ' · <span class="text-orange-500 text-xs">요약 ' + d.invalidated_summaries + '일 갱신 필요</span>' : '') +
+        '</div>';
+      setTimeout(function() { location.reload(); }, 1500);
+    } else {
+      var msg = '업로드 실패';
+      try { msg = JSON.parse(evt.detail.xhr.responseText).detail; } catch(e) {}
+      result.innerHTML = '<div class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">❌ ' + msg + '</div>';
+    }
+  }
+
+  // 페이지 로드 시 읽음 상태 복원
+  initReadStates();
+
+  // On load: check if summarize is already running
+  (async function() {
+    try {
+      var res = await fetch('/api/rooms/' + ROOM_ID + '/summarize/status');
+      var data = await res.json();
+      if (data.status === 'running') {
+        switchTab('generate');
+        showProgressArea(true);
+        updateProgressUI(data);
+        startPolling(ROOM_ID);
+      }
+    } catch(e) {}
+  })();
+</script>
+{% endblock %}
