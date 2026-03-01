@@ -12,42 +12,58 @@ from .models import Base, ChatRoom, Message, Summary, SyncLog, URL
 
 
 class Database:
-    """SQLite 데이터베이스 관리 클래스."""
-    
+    """데이터베이스 관리 클래스 (SQLite/PostgreSQL 지원)."""
+
     def __init__(self, db_path: Optional[str] = None):
-        if db_path is None:
-            # 기본 경로: 프로젝트 루트의 data/db/chat_history.db
-            project_root = Path(__file__).parent.parent.parent
-            db_dir = project_root / "data" / "db"
-            db_dir.mkdir(parents=True, exist_ok=True)
-            db_path = str(db_dir / "chat_history.db")
-        
-        self.db_path = db_path
-        
-        # SQLite 최적화 설정
-        self.engine = create_engine(
-            f"sqlite:///{db_path}", 
-            echo=False,
-            connect_args={
-                "check_same_thread": False,
-                "timeout": 30
-            }
-        )
-        
-        # WAL 모드 및 성능 최적화
-        from sqlalchemy import event
-        
-        @event.listens_for(self.engine, "connect")
-        def set_sqlite_pragma(dbapi_connection, connection_record):
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA synchronous=NORMAL")
-            cursor.execute("PRAGMA cache_size=10000")
-            cursor.execute("PRAGMA temp_store=MEMORY")
-            cursor.close()
-        
+        # 환경 변수에서 DATABASE_URL 확인 (PostgreSQL 우선)
+        database_url = os.getenv('DATABASE_URL')
+
+        if database_url:
+            # PostgreSQL 사용
+            self.engine = create_engine(
+                database_url,
+                echo=False,
+                pool_pre_ping=True,  # 연결 확인 후 사용
+                pool_size=5,
+                max_overflow=10
+            )
+            self.db_path = None  # PostgreSQL은 파일 경로 없음
+            self.db_type = "postgresql"
+        else:
+            # SQLite 사용 (기존 방식)
+            if db_path is None:
+                # 기본 경로: 프로젝트 루트의 data/db/chat_history.db
+                project_root = Path(__file__).parent.parent.parent
+                db_dir = project_root / "data" / "db"
+                db_dir.mkdir(parents=True, exist_ok=True)
+                db_path = str(db_dir / "chat_history.db")
+
+            self.db_path = db_path
+            self.db_type = "sqlite"
+
+            # SQLite 최적화 설정
+            self.engine = create_engine(
+                f"sqlite:///{db_path}",
+                echo=False,
+                connect_args={
+                    "check_same_thread": False,
+                    "timeout": 30
+                }
+            )
+
+            # WAL 모드 및 성능 최적화
+            from sqlalchemy import event
+
+            @event.listens_for(self.engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute("PRAGMA cache_size=10000")
+                cursor.execute("PRAGMA temp_store=MEMORY")
+                cursor.close()
+
         self.SessionLocal = sessionmaker(bind=self.engine, expire_on_commit=False)
-        
         # 테이블 생성
         Base.metadata.create_all(self.engine)
     

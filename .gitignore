@@ -76,3 +76,7 @@ htmlcov/
 *.db-shm
 *.sqlite
 *.sqlite3
+# Environment files with sensitive data
+env.local
+*.backup
+.env.local.swp
