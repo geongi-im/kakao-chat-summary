@@ -22,33 +22,45 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
   {% for item in room_stats %}
   {% set room = item.room %}
-  {% set created_date = item.created_date %}
-  {% set total_days = item.total_days %}
-  {% set unread_days = item.unread_days %}
+  {% set stats = item.stats %}
+  {% set total_msg = stats.get('total_messages', 0) if stats else 0 %}
+  {% set senders = stats.get('unique_senders', 0) if stats else 0 %}
+  {% set first_d = stats.get('first_date') if stats else None %}
+  {% set last_d = stats.get('last_date') if stats else None %}
 
   <article class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm
                   hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
     <div class="h-1" style="background: linear-gradient(90deg, #FEE500, #FCD34D);"></div>
     <div class="p-5">
-      <div class="mb-4">
-        <h2 class="font-semibold text-gray-900 text-base leading-snug truncate">{{ room.name }}</h2>
+      <div class="flex items-start justify-between gap-2 mb-4">
+        <h2 class="font-semibold text-gray-900 text-base leading-snug truncate flex-1 min-w-0">{{ room.name }}</h2>
+        <button onclick="event.stopPropagation(); deleteRoom({{ room.id }}, '{{ room.name | replace("'", "\\'") }}')"
+          class="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center
+                 text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all flex-shrink-0"
+          title="채팅방 삭제">✕</button>
       </div>
 
-      <div class="flex items-center gap-2 mb-3">
-        <div class="flex-1 bg-gray-50 rounded-lg px-2 py-1.5 text-center">
-          <p class="text-[9px] text-gray-400">생성일</p>
-          <p class="text-xs font-medium text-gray-600 tabular-nums">{{ created_date or '-' }}</p>
+      {% if first_d and last_d %}
+      <div class="flex items-center gap-2 mb-4">
+        <div class="flex-1 bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+          <p class="text-[10px] text-gray-400 mb-0.5">시작</p>
+          <p class="text-sm font-semibold text-gray-800 tabular-nums">{{ first_d }}</p>
         </div>
-        <div class="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 {% if unread_days > 0 %}bg-orange-50 text-orange-700{% else %}bg-gray-100 text-gray-500{% endif %} rounded-lg">
-          <span class="text-xs font-medium tabular-nums">{{ total_days }}일 중 {{ unread_days }}일 안읽음</span>
+        <span class="text-gray-300 text-sm">→</span>
+        <div class="flex-1 bg-gray-50 rounded-xl px-3 py-2.5 text-center">
+          <p class="text-[10px] text-gray-400 mb-0.5">최근</p>
+          <p class="text-sm font-semibold text-gray-800 tabular-nums">{{ last_d }}</p>
         </div>
       </div>
+      {% else %}
+      <div class="mb-4 h-14"></div>
+      {% endif %}
 
       <a href="/rooms/{{ room.id }}"
-        class="w-full flex items-center justify-between px-4 py-3 bg-gray-900 hover:bg-gray-800 rounded-xl
-               text-sm font-semibold text-white transition-all active:scale-95 shadow-sm hover:shadow-md">
-        <span>채팅방 열기</span>
-        <span class="text-lg">→</span>
+        class="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-yellow-50 rounded-xl
+               text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+        <span>채팅방 보기</span>
+        <span>→</span>
       </a>
     </div>
   </article>
@@ -165,6 +177,20 @@
 
 {% block scripts %}
 <script>
+  async function deleteRoom(roomId, roomName) {
+    if (!confirm("'" + roomName + "' 채팅방을 삭제할까요?\n연관된 데이터가 DB에서 삭제됩니다.")) return;
+    try {
+      var res = await fetch('/api/rooms/' + roomId, { method: 'DELETE' });
+      var data = await res.json();
+      if (res.ok) {
+        showFlash("'" + roomName + "' 채팅방이 삭제되었습니다.", 'success');
+        setTimeout(function() { location.reload(); }, 800);
+      } else {
+        showFlash(data.detail || '삭제 실패', 'error');
+      }
+    } catch(e) { showFlash('삭제 중 오류가 발생했습니다.', 'error'); }
+  }
+
   function onRoomCreated(evt) {
     if (evt.detail.successful) {
       document.getElementById('add-room-modal').classList.add('hidden');

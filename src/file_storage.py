@@ -117,6 +117,9 @@ class FileStorage:
         messages_by_date = {}
         
         for filepath in room_dir.glob("*_full.md"):
+            # 백업 파일 무시
+            if filepath.name.endswith('.bak'):
+                continue
             # 파일명에서 날짜 추출
             match = re.search(r'_(\d{8})_full\.md$', filepath.name)
             if match:
@@ -136,6 +139,9 @@ class FileStorage:
         
         dates = []
         for filepath in room_dir.glob("*_full.md"):
+            # 백업 파일 무시
+            if filepath.name.endswith('.bak'):
+                continue
             match = re.search(r'_(\d{8})_full\.md$', filepath.name)
             if match:
                 date_compact = match.group(1)
@@ -202,11 +208,21 @@ class FileStorage:
         filepath = room_dir / filename
         
         if filepath.exists():
-            # [Safety] 삭제 대신 백업으로 변경
-            backup_path = filepath.with_suffix('.md.bak')
-            import shutil
-            shutil.move(str(filepath), str(backup_path))
-            print(f"[Backup] 요약 파일 백업됨: {backup_path.name}")
+            filepath.unlink()  # 실제 삭제
+            print(f"[Delete] 요약 파일 삭제됨: {filename}")
+            return True
+        return False
+    
+    def delete_daily_original(self, room_name: str, date_str: str) -> bool:
+        """해당 날짜의 원본 메시지 파일 삭제."""
+        room_dir = self.original_dir / self._sanitize_name(room_name)
+        date_compact = date_str.replace("-", "")
+        filename = f"{self._sanitize_name(room_name)}_{date_compact}_full.md"
+        filepath = room_dir / filename
+        
+        if filepath.exists():
+            filepath.unlink()  # 실제 삭제
+            print(f"[Delete] 원본 파일 삭제됨: {filename}")
             return True
         return False
     
@@ -353,9 +369,13 @@ class FileStorage:
     def _sanitize_name(self, name: str) -> str:
         """파일/디렉토리 이름에 사용 가능하도록 정리."""
         # 특수문자 제거, 공백은 _로 대체
-        sanitized = re.sub(r'[<>:"/\\|?*]', '', name)
-        sanitized = sanitized.replace(' ', '_')
-        return sanitized.strip()
+        sanitized = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', name)
+        sanitized = sanitized.replace(' ', '_').strip()
+        if '..' in sanitized or sanitized.startswith('.'):
+            raise ValueError(f"Invalid name: {name}")
+        if not sanitized:
+            raise ValueError(f"Empty name after sanitization: {name}")
+        return sanitized
     
     def _load_existing_messages(self, filepath: Path) -> List[str]:
         """기존 파일에서 메시지 로드."""

@@ -159,39 +159,60 @@ class Database:
     # ==================== Message 관련 ====================
     
     def add_messages(self, room_id: int, messages: List[Dict[str, Any]], batch_size: int = 500) -> int:
-        """메시지 일괄 추가 (중복 무시, 배치 처리)."""
+        """메시지 일괄 추가 (중복 무시, 배치 처리). INSERT OR IGNORE 방식."""
         added_count = 0
-        
+
         # 배치 단위로 처리
         for i in range(0, len(messages), batch_size):
             batch = messages[i:i + batch_size]
-            
+
             with self.get_session() as session:
-                for msg_data in batch:
-                    try:
-                        # 중복 체크
-                        existing = session.query(Message).filter(
-                            Message.room_id == room_id,
-                            Message.sender == msg_data['sender'],
-                            Message.message_date == msg_data['date'],
-                            Message.message_time == msg_data.get('time'),
-                            Message.content == msg_data.get('content')
-                        ).first()
-                        
-                        if existing is None:
-                            msg = Message(
+                if self.db_type == "sqlite":
+                    from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+                    for msg_data in batch:
+                        try:
+                            stmt = sqlite_insert(Message).values(
                                 room_id=room_id,
                                 sender=msg_data['sender'],
                                 content=msg_data.get('content'),
                                 message_date=msg_data['date'],
                                 message_time=msg_data.get('time'),
-                                raw_line=msg_data.get('raw_line')
+                                raw_line=msg_data.get('raw_line'),
                             )
-                            session.add(msg)
-                            added_count += 1
-                    except Exception as e:
-                        continue
-        
+                            stmt = stmt.on_conflict_do_nothing(
+                                constraint='uq_message_unique'
+                            )
+                            result = session.execute(stmt)
+                            if result.rowcount > 0:
+                                added_count += 1
+                        except Exception:
+                            continue
+                else:
+                    # PostgreSQL fallback: per-message SELECT check
+                    for msg_data in batch:
+                        try:
+                            existing = session.query(Message).filter(
+                                Message.room_id == room_id,
+                                Message.sender == msg_data['sender'],
+                                Message.message_date == msg_data['date'],
+                                Message.message_time == msg_data.get('time'),
+                                Message.content == msg_data.get('content')
+                            ).first()
+
+                            if existing is None:
+                                msg = Message(
+                                    room_id=room_id,
+                                    sender=msg_data['sender'],
+                                    content=msg_data.get('content'),
+                                    message_date=msg_data['date'],
+                                    message_time=msg_data.get('time'),
+                                    raw_line=msg_data.get('raw_line')
+                                )
+                                session.add(msg)
+                                added_count += 1
+                        except Exception:
+                            continue
+
         return added_count
     
     def get_messages_by_room(self, room_id: int, 
@@ -221,6 +242,16 @@ class Database:
                 Message.message_date == target_date
             ).scalar()
     
+
+    def delete_messages_by_date(self, room_id: int, target_date: date) -> int:
+        """특정 날짜의 모든 메시지 삭제."""
+        with self.get_session() as session:
+            deleted = session.query(Message).filter(
+                Message.room_id == room_id,
+                Message.message_date == target_date
+            ).delete()
+            return deleted
+
     def get_unique_senders(self, room_id: int) -> List[str]:
         """채팅방의 참여자 목록 조회."""
         with self.get_session() as session:
@@ -228,6 +259,52 @@ class Database:
                 Message.room_id == room_id
             ).distinct().all()
             return [r[0] for r in results]
+
+    def get_available_dates_for_room(self, room_id: int) -> List[str]:
+        """채팅방의 실제 메시지가 있는 날짜 목록 (DB 기반, 숨김 날짜 제외)."""
+        with self.get_session() as session:
+            dates = session.query(Message.message_date).filter(
+                Message.room_id == room_id,
+                Message.is_hidden == 0
+            ).distinct().order_by(Message.message_date.desc()).all()
+            # SQLAlchemy Row 객체에서 date 객체 추출
+            return [row[0].isoformat() for row in dates]
+
+    def get_all_dates_for_room(self, room_id: int) -> List[str]:
+        """숨김 여부 상관없이 모든 날짜 목록."""
+        with self.get_session() as session:
+            dates = session.query(Message.message_date).filter(
+                Message.room_id == room_id
+            ).distinct().order_by(Message.message_date.desc()).all()
+            return [row[0].isoformat() for row in dates]
+
+    def get_hidden_dates(self, room_id: int) -> List[str]:
+        """숨겨진 날짜 목록 조회."""
+        with self.get_session() as session:
+            dates = session.query(Message.message_date).filter(
+                Message.room_id == room_id,
+                Message.is_hidden == 1
+            ).distinct().order_by(Message.message_date.desc()).all()
+            return [row[0].isoformat() for row in dates]
+
+    def set_date_hidden(self, room_id: int, target_date: date, hidden: bool) -> int:
+        """특정 날짜의 메시지 숨김/보이기 토글."""
+        with self.get_session() as session:
+            updated = session.query(Message).filter(
+                Message.room_id == room_id,
+                Message.message_date == target_date
+            ).update({'is_hidden': 1 if hidden else 0})
+            return updated
+
+    def is_date_hidden(self, room_id: int, target_date: date) -> bool:
+        """특정 날짜가 숨겨져 있는지 확인."""
+        with self.get_session() as session:
+            count = session.query(func.count(Message.id)).filter(
+                Message.room_id == room_id,
+                Message.message_date == target_date,
+                Message.is_hidden == 1
+            ).scalar()
+            return count > 0
     
     # ==================== Summary 관련 ====================
     
@@ -370,7 +447,58 @@ class Database:
             return count
     
     # ==================== 통계 관련 ====================
-    
+
+    def get_all_rooms_with_stats(self) -> List[Dict[str, Any]]:
+        """모든 채팅방을 통계와 함께 한 번의 쿼리로 조회."""
+        with self.get_session() as session:
+            from sqlalchemy import select, literal_column
+
+            # 단일 JOIN 쿼리로 모든 방의 통계 가져오기
+            msg_count_subq = (
+                select(
+                    Message.room_id,
+                    func.count(Message.id).label('total_messages'),
+                    func.count(func.distinct(Message.sender)).label('unique_senders'),
+                    func.min(Message.message_date).label('first_date'),
+                    func.max(Message.message_date).label('last_date'),
+                )
+                .group_by(Message.room_id)
+                .subquery()
+            )
+
+            rows = (
+                session.query(
+                    ChatRoom,
+                    func.coalesce(msg_count_subq.c.total_messages, 0).label('total_messages'),
+                    func.coalesce(msg_count_subq.c.unique_senders, 0).label('unique_senders'),
+                    msg_count_subq.c.first_date,
+                    msg_count_subq.c.last_date,
+                )
+                .outerjoin(msg_count_subq, ChatRoom.id == msg_count_subq.c.room_id)
+                .order_by(func.coalesce(msg_count_subq.c.total_messages, 0).desc())
+                .all()
+            )
+
+            result = []
+            for row in rows:
+                room = row[0]
+                detached_room = ChatRoom(
+                    id=room.id, name=room.name, file_path=room.file_path,
+                    last_sync_at=room.last_sync_at, created_at=room.created_at
+                )
+                result.append({
+                    "room": detached_room,
+                    "stats": {
+                        'room_name': room.name,
+                        'total_messages': row[1],
+                        'unique_senders': row[2],
+                        'first_date': row[3],
+                        'last_date': row[4],
+                        'last_sync': room.last_sync_at,
+                    },
+                })
+            return result
+
     def get_room_stats(self, room_id: int) -> Dict[str, Any]:
         """채팅방 통계 조회."""
         with self.get_session() as session:
@@ -400,6 +528,28 @@ class Database:
                 'last_sync': room.last_sync_at
             }
 
+
+
+    def update_summary_read_status(self, room_id: int, summary_date: date, is_read: bool) -> bool:
+        """요약 읽음 상태 업데이트."""
+        with self.get_session() as session:
+            summary = session.query(Summary).filter(
+                Summary.room_id == room_id,
+                Summary.summary_date == summary_date
+            ).first()
+            if summary:
+                summary.is_read = 1 if is_read else 0
+                return True
+            return False
+
+    def get_summary_read_status(self, room_id: int, summary_date: date) -> bool:
+        """요약 읽음 상태 조회."""
+        with self.get_session() as session:
+            summary = session.query(Summary).filter(
+                Summary.room_id == room_id,
+                Summary.summary_date == summary_date
+            ).first()
+            return summary.is_read == 1 if summary else False
 
 # 싱글톤 인스턴스
 _db_instance: Optional[Database] = None

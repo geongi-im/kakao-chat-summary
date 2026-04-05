@@ -1,5 +1,12 @@
 """URL 관련 API."""
+import logging
+
 from fastapi import APIRouter, HTTPException
+
+from db.database import get_db
+from file_storage import get_storage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -10,10 +17,7 @@ async def get_urls(room_id: int, list_type: str = "all"):
     채팅방 URL 목록 조회.
     list_type: "recent" | "weekly" | "all"
     """
-    from db.database import Database
-    from file_storage import FileStorage
-
-    db = Database()
+    db = get_db()
     room = db.get_room_by_id(room_id)
     if not room:
         raise HTTPException(status_code=404, detail="채팅방을 찾을 수 없습니다.")
@@ -21,7 +25,7 @@ async def get_urls(room_id: int, list_type: str = "all"):
     if list_type not in ("recent", "weekly", "all"):
         raise HTTPException(status_code=400, detail="list_type은 recent/weekly/all 중 하나여야 합니다.")
 
-    storage = FileStorage()
+    storage = get_storage()
     urls = storage.load_url_list(room.name, list_type)
 
     return {
@@ -38,17 +42,15 @@ async def get_urls(room_id: int, list_type: str = "all"):
 @router.post("/{room_id}/urls/sync")
 async def sync_urls(room_id: int):
     """요약 파일에서 URL을 추출하여 DB와 파일에 저장."""
-    from db.database import Database
-    from file_storage import FileStorage
     from url_extractor import extract_urls_from_text, deduplicate_urls
     from datetime import date, timedelta
 
-    db = Database()
+    db = get_db()
     room = db.get_room_by_id(room_id)
     if not room:
         raise HTTPException(status_code=404, detail="채팅방을 찾을 수 없습니다.")
 
-    storage = FileStorage()
+    storage = get_storage()
     today = date.today()
     three_days_ago = today - timedelta(days=3)
     seven_days_ago = today - timedelta(days=7)
@@ -101,7 +103,7 @@ async def sync_urls(room_id: int):
         db.clear_urls_by_room(room_id)
         db.add_urls_batch(room_id, all_urls)
     except Exception:
-        pass
+        logger.warning("Failed to sync URLs to DB for room=%s", room_id, exc_info=True)
 
     return {
         "success": True,

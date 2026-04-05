@@ -25,7 +25,7 @@
             </span>
             {% endif %}
           </div>
-          <p class="text-xs text-gray-400 mt-0.5">모델: {{ p.model }}</p>
+          <p class="text-xs text-gray-400 mt-0.5">기본 모델: {{ p.model }}</p>
         </div>
         <div class="flex-shrink-0 mt-0.5">
           {% if p.has_key %}
@@ -40,8 +40,40 @@
         </div>
       </div>
 
-      <!-- Env key badge -->
+      <!-- Model Selection -->
+      <div class="mb-3">
+        <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider block mb-1.5">모델 선택</label>
+        <div class="flex gap-2">
+          <select id="model-select-{{ p.key }}"
+                  data-provider="{{ p.key }}"
+                  class="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300 transition-all">
+            <option value="" {% if not p.custom_model %}selected{% endif %}>기본 ({{ p.model }})</option>
+            {% for m in p.available_models %}
+            <option value="{{ m }}" {% if p.custom_model == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+            <option value="_custom" {% if p.custom_model and p.custom_model not in p.available_models %}selected{% endif %}>직접 입력...</option>
+          </select>
+          <button onclick="saveModel('{{ p.key }}')"
+                  class="px-3 py-2 text-xs font-medium rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-all"
+                  title="저장">
+            💾
+          </button>
+        </div>
+        <!-- Custom model input (hidden by default) -->
+        <input type="text" id="custom-model-{{ p.key }}"
+               placeholder="모델명 입력 (예: gpt-4.1-preview)"
+               class="mt-2 w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300 transition-all hidden"
+               data-provider="{{ p.key }}" />
+      </div>
+
+      <!-- Current effective model -->
       <div class="bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2.5">
+        <p class="text-[10px] text-gray-400 mb-0.5 font-semibold uppercase tracking-wider">현재 적용 모델</p>
+        <code class="text-xs text-gray-700 font-mono" id="effective-model-{{ p.key }}">{{ p.effective_model }}</code>
+      </div>
+
+      <!-- Env key -->
+      <div class="bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2.5 mt-2">
         <p class="text-[10px] text-gray-400 mb-0.5 font-semibold uppercase tracking-wider">환경변수</p>
         <code class="text-xs text-gray-700 font-mono">{{ p.env_key }}</code>
       </div>
@@ -113,6 +145,56 @@
   </div>
 </div>
 
+<!-- Hidden Dates Management -->
+{% if hidden_data %}
+<div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden mb-6">
+  <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+    <span class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-base">👁️</span>
+    <div>
+      <h2 class="font-semibold text-gray-900 text-sm">숨겨진 날짜 관리</h2>
+      <p class="text-xs text-gray-400">숨겨진 날짜를 복구할 수 있습니다</p>
+    </div>
+  </div>
+  <div class="p-6">
+    {% for room in hidden_data %}
+    <div class="mb-5 last:mb-0">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold text-gray-700">{{ room.room_name }}</h3>
+        <span class="text-xs text-gray-400">전체 {{ room.total_dates }}일 중 {{ room.hidden_count }}일 숨김</span>
+      </div>
+      {% if room.hidden_count > 0 %}
+      <div class="max-h-48 overflow-y-auto border border-gray-200 rounded-xl p-2 space-y-1">
+        {% for d in room.hidden_dates %}
+        <div class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg">
+          <span class="text-sm text-gray-700 font-mono">{{ d }}</span>
+          <div class="flex items-center gap-2">
+            <button onclick="unhideDate({{ room.room_id }}, '{{ d }}', this)"
+                    class="text-xs px-2.5 py-1 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors font-medium">
+              ↩ 복구
+            </button>
+            <button onclick="removeUnhideRow(this)"
+                    class="text-xs text-gray-300 hover:text-gray-500 transition-colors"
+                    style="display:none;">
+              ×
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <button onclick="unhideAll({{ room.room_id }}, '{{ room.room_name }}')"
+              class="mt-2 text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors font-medium">
+        전체 복구
+      </button>
+      {% else %}
+      <p class="text-sm text-gray-400 py-3">숨겨진 날짜가 없습니다</p>
+      {% endif %}
+    </div>
+    {% if not loop.last %}<hr class="border-gray-100">{% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <!-- System Info -->
 <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
   <h2 class="font-semibold text-gray-900 text-sm mb-4">ℹ️ 시스템 정보</h2>
@@ -144,5 +226,99 @@
 {% block scripts %}
 <script>
   document.getElementById('api-origin').textContent = window.location.origin;
+
+  // Show/hide custom model input based on select value
+  document.querySelectorAll('select[id^="model-select-"]').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+      var provider = this.dataset.provider;
+      var customInput = document.getElementById('custom-model-' + provider);
+      if (this.value === '_custom') {
+        customInput.classList.remove('hidden');
+        customInput.focus();
+      } else {
+        customInput.classList.add('hidden');
+      }
+    });
+  });
+
+  function saveModel(provider) {
+    var sel = document.getElementById('model-select-' + provider);
+    var customInput = document.getElementById('custom-model-' + provider);
+    var model;
+
+    if (sel.value === '_custom') {
+      model = customInput.value.trim();
+      if (!model) {
+        showFlash('모델명을 입력해주세요.', 'error');
+        return;
+      }
+    } else {
+      model = sel.value;  // 빈 값이면 기본 모델로 복구
+    }
+
+    fetch('/api/settings/model', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({provider: provider, model: model})
+    })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || '오류 발생'); });
+      return r.json();
+    })
+    .then(function(data) {
+      document.getElementById('effective-model-' + provider).textContent = data.effective_model;
+      showFlash(data.message, 'success');
+    })
+    .catch(function(err) {
+      showFlash('모델 변경 실패: ' + err.message, 'error');
+    });
+  }
+
+  function unhideDate(roomId, dateStr, btn) {
+    fetch('/api/rooms/' + roomId + '/dates/' + dateStr + '/hidden', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({hidden: false})
+    })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || '오류 발생'); });
+      return r.json();
+    })
+    .then(function() {
+      var row = btn.closest('.flex.items-center.justify-between');
+      row.style.transition = 'opacity 0.3s, transform 0.3s';
+      row.style.opacity = '0';
+      row.style.transform = 'translateX(20px)';
+      setTimeout(function() { row.remove(); }, 300);
+      showFlash(dateStr + ' 복구됨', 'success');
+    })
+    .catch(function(err) {
+      showFlash('복구 실패: ' + err.message, 'error');
+    });
+  }
+
+  function unhideAll(roomId, roomName) {
+    if (!confirm(roomName + '의 모든 숨겨진 날짜를 복구하시겠습니까?')) return;
+    fetch('/api/rooms/' + roomId + '/hidden-dates')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var dates = data.hidden_dates;
+      if (!dates.length) { showFlash('숨겨진 날짜가 없습니다', 'info'); return; }
+      var promises = dates.map(function(d) {
+        return fetch('/api/rooms/' + roomId + '/dates/' + d + '/hidden', {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({hidden: false})
+        });
+      });
+      Promise.all(promises).then(function() {
+        showFlash(dates.length + '개 날짜 복구 완료', 'success');
+        setTimeout(function() { location.reload(); }, 1000);
+      });
+    })
+    .catch(function(err) {
+      showFlash('복구 실패: ' + err.message, 'error');
+    });
+  }
 </script>
 {% endblock %}

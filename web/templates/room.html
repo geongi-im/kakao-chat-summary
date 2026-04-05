@@ -18,41 +18,19 @@
   </div>
   <div class="flex items-start justify-between gap-4">
     <h1 class="text-2xl font-bold text-gray-900 leading-tight">{{ room.name }}</h1>
-    <a href="/"
-      class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-      ← 목록
-    </a>
+    <div class="flex items-center gap-2">
+      <button onclick="deleteRoom({{ room.id }}, '{{ room.name | replace("'", "\\'") }}')"
+        class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+        🗑️ 채팅방 삭제
+      </button>
+      <a href="/"
+        class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+        ← 목록
+      </a>
+    </div>
   </div>
 
-  <!-- Stats bar -->
-  <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3">
-    <div class="flex items-center gap-1.5 text-sm">
-      <span class="text-gray-400">💬</span>
-      <span class="font-semibold text-gray-900 tabular-nums">{{ "{:,}".format(total_msg) }}</span>
-      <span class="text-gray-400 text-xs">메시지</span>
-    </div>
-    <div class="flex items-center gap-1.5 text-sm">
-      <span class="text-gray-400">👥</span>
-      <span class="font-semibold text-gray-900">{{ senders }}</span>
-      <span class="text-gray-400 text-xs">참여자</span>
-    </div>
-    {% if first_d and last_d %}
-    <div class="flex items-center gap-1.5 text-sm">
-      <span class="text-gray-400">📅</span>
-      <span class="text-gray-600 text-xs">{{ first_d }} – {{ last_d }}</span>
-    </div>
-    {% endif %}
-    <div class="flex items-center gap-1.5 text-sm">
-      <span class="text-gray-400">📝</span>
-      <span class="font-semibold text-gray-900">{{ summarized_days }}/{{ total_days }}</span>
-      <span class="text-gray-400 text-xs">일 요약</span>
-      {% if total_days > 0 %}
-      <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-        <div class="h-full rounded-full" style="width:{{ (summarized_days / total_days * 100)|round }}%; background:#FEE500;"></div>
-      </div>
-      {% endif %}
-    </div>
-  </div>
+
 </div>
 
 <!-- Tab Panel -->
@@ -72,28 +50,25 @@
 
   <!-- ── Tab: 대시보드 ── -->
   <div id="panel-dashboard" class="tab-panel p-6">
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-      <div class="bg-gray-50 rounded-2xl p-4 text-center">
-        <div class="text-2xl mb-1">💬</div>
-        <div class="text-xl font-bold text-gray-900 tabular-nums">{{ "{:,}".format(total_msg) }}</div>
-        <div class="text-xs text-gray-400 mt-0.5">전체 메시지</div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+      <div class="bg-gray-50 rounded-xl p-2.5 text-center">
+        <div class="text-lg font-bold text-gray-900 tabular-nums">{{ "{:,}".format(total_msg) }}</div>
+        <div class="text-[10px] text-gray-400">메시지</div>
       </div>
-      <div class="bg-gray-50 rounded-2xl p-4 text-center">
-        <div class="text-2xl mb-1">👥</div>
-        <div class="text-xl font-bold text-gray-900">{{ senders }}</div>
-        <div class="text-xs text-gray-400 mt-0.5">참여자</div>
+      <div class="bg-gray-50 rounded-xl p-2.5 text-center">
+        <div class="text-lg font-bold text-gray-900">{{ senders }}</div>
+        <div class="text-[10px] text-gray-400">참여자</div>
       </div>
-      <div class="bg-gray-50 rounded-2xl p-4 text-center">
-        <div class="text-2xl mb-1">📅</div>
-        <div class="text-xl font-bold text-gray-900">{{ total_days }}</div>
-        <div class="text-xs text-gray-400 mt-0.5">데이터 일수</div>
+      <div class="bg-gray-50 rounded-xl p-2.5 text-center">
+        <div class="text-lg font-bold text-gray-900">{{ room_created if room_created else "-" }}</div>
+        <div class="text-[10px] text-gray-400">생성일</div>
       </div>
-      <div class="bg-gray-50 rounded-2xl p-4 text-center">
-        <div class="text-2xl mb-1">📝</div>
-        <div class="text-xl font-bold text-gray-900">{{ summarized_days }}/{{ total_days }}</div>
-        <div class="text-xs text-gray-400 mt-0.5">요약 완료</div>
+      <div class="bg-gray-50 rounded-xl p-2.5 text-center">
+        <div class="text-lg font-bold text-gray-900">{{ summarized_days }}/{{ total_days }}일</div>
+        <div class="text-[10px] text-gray-400">요약</div>
       </div>
     </div>
+
 
     <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">최근 요약</h3>
     {% if recent_summaries %}
@@ -101,13 +76,15 @@
       {% for s in recent_summaries %}
       <button
         onclick="switchTab('summaries'); loadSummary({{ room.id }}, '{{ s.summary_date }}')"
-        class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-yellow-50 rounded-xl transition-colors text-left group">
+        class="recent-summary-btn w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-yellow-50 rounded-xl transition-colors text-left group"
+        data-date="{{ s.summary_date }}" data-read-status="{{ 1 if s.is_read else 0 }}">
         <div class="flex items-center gap-3">
           <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:#FEE500;"></span>
           <span class="text-sm font-medium text-gray-900">{{ s.summary_date }}</span>
           {% if s.llm_provider %}
           <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ s.llm_provider }}</span>
           {% endif %}
+          <span class="read-status-badge"></span>
         </div>
         <span class="text-gray-300 group-hover:text-gray-500 transition-colors">→</span>
       </button>
@@ -126,6 +103,39 @@
 
   <!-- ── Tab: 날짜별 요약 ── -->
   <div id="panel-summaries" class="tab-panel hidden">
+
+    <!-- 캘린더 아이콘 (모바일/데스크탑 공통) -->
+    <div class="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+      <span class="text-sm font-semibold text-gray-700">날짜 선택</span>
+      <button id="calendar-icon-btn" onclick="toggleCalendarPopup()"
+        class="text-lg hover:scale-110 transition-transform" title="캘린더 보기">
+        📅
+      </button>
+    </div>
+
+    <!-- 캘린더 팝업 (초기에는 숨김) -->
+    <div id="calendar-popup" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 min-h-screen">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full max-h-[90vh] overflow-auto mx-auto">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <h3 class="text-sm font-semibold text-gray-700">날짜 선택</h3>
+          <button onclick="toggleCalendarPopup()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+        <div class="p-4">
+          <div id="summary-calendar" class="w-full"></div>
+          <!-- 범례 -->
+          <div class="flex items-center justify-center gap-4 mt-3 text-xs text-gray-500">
+            <div class="flex items-center gap-1.5">
+              <div class="w-2 h-2 rounded-full bg-red-500"></div>
+              <span>안읽음</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <div class="w-2 h-2 rounded-full bg-green-500"></div>
+              <span>읽음</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 모바일 전용: 날짜 select (sm 이상에서 숨김) -->
     <div class="sm:hidden border-b border-gray-100 px-3 py-2">
@@ -150,6 +160,7 @@
         {% for item in dates_info %}
         <button id="date-btn-{{ item.date }}"
           onclick="loadSummary({{ room.id }}, '{{ item.date }}')"
+          data-read-status="{{ item.is_read if item.is_read is not none else '' }}"
           class="w-full text-left px-3 py-3 border-b border-gray-50 hover:bg-yellow-50 transition-colors">
           <div class="text-xs font-medium tabular-nums
                       {% if item.has_summary %}text-gray-800{% else %}text-gray-400{% endif %}">
@@ -170,13 +181,25 @@
 
       <!-- 콘텐츠 영역 (모바일에서 전체 너비) -->
       <div class="flex-1 overflow-y-auto min-w-0">
-        <!-- 툴바: 날짜 배지 + 읽음 토글 버튼 -->
+        <!-- 툴바: 날짜 배지 + 읽음/숨김 토글 버튼 -->
         <div class="sticky top-0 bg-white border-b border-gray-100 px-4 py-2 min-h-[44px] flex items-center justify-between gap-2">
           <span id="summary-date-badge" class="text-xs text-gray-400 flex-shrink-0">날짜를 선택하세요</span>
-          <button id="read-toggle-btn"
-            onclick="toggleRead()"
-            class="hidden flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium">
-          </button>
+          <div class="flex items-center gap-2">
+            <button id="read-toggle-btn"
+              onclick="toggleRead()"
+              class="hidden flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium">
+            </button>
+            <button id="hide-date-btn"
+              onclick="hideDate()"
+              class="hidden flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors font-medium">
+              👁️ 숨기기
+            </button>
+            <button id="delete-summary-btn"
+              onclick="deleteSummary()"
+              class="hidden flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors font-medium">
+              🗑️ 삭제
+            </button>
+          </div>
         </div>
         <div id="summary-content" class="px-4 sm:px-5 py-4 md-prose">
           <div class="text-center py-16 text-gray-300">
@@ -256,23 +279,33 @@
       </div>
       <div>
         <label class="block text-xs font-semibold text-gray-600 mb-1.5">날짜 범위</label>
-        <select id="date-range"
+        <select id="date-range" onchange="toggleSkipExisting()"
           class="w-full border border-gray-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm
                  focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:bg-white transition-colors">
           <option value="pending">요약 필요한 날짜만</option>
-          <option value="today">오늘</option>
-          <option value="yesterday">어제~오늘</option>
-          <option value="2days">엇그제~오늘</option>
-          <option value="all">전체 날짜</option>
+          <option value="custom">직접 선택</option>
         </select>
       </div>
     </div>
 
-    <label class="flex items-center gap-2 mb-5 cursor-pointer w-fit">
-      <input type="checkbox" id="skip-existing" checked
-        class="w-4 h-4 rounded border-gray-300 accent-yellow-400 cursor-pointer">
-      <span class="text-sm text-gray-600">이미 요약된 날짜 건너뛰기</span>
-    </label>
+    <!-- 날짜 직접 선택 영역 (초기에는 숨김) -->
+    <div id="custom-dates-area" class="hidden mb-5">
+      <div class="flex items-center justify-between mb-2">
+        <label class="block text-xs font-semibold text-gray-600">요약할 날짜 선택</label>
+        <div class="flex items-center gap-2">
+          <button id="select-all-btn" onclick="toggleSelectAll()" class="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">전체선택</button>
+        </div>
+      </div>
+      <!-- 탭: 요약됨 / 미요약 -->
+      <div class="flex border-b border-gray-200 mb-2">
+        <button id="custom-tab-all" onclick="switchCustomTab('all')" class="px-3 py-1.5 text-xs font-medium border-b-2 border-yellow-400 text-gray-900 transition-colors">전체</button>
+        <button id="custom-tab-summarized" onclick="switchCustomTab('summarized')" class="px-3 py-1.5 text-xs font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-700 transition-colors">요약됨</button>
+        <button id="custom-tab-pending" onclick="switchCustomTab('pending')" class="px-3 py-1.5 text-xs font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-700 transition-colors">미요약</button>
+      </div>
+      <div id="custom-dates-list" class="max-h-64 overflow-y-auto border border-gray-200 rounded-xl p-3 space-y-1.5">
+        <!-- JavaScript로 동적으로 생성 -->
+      </div>
+    </div>
 
     <button id="start-summarize-btn"
       onclick="startSummarize({{ room.id }})"
@@ -313,31 +346,270 @@
   var ROOM_ID = {{ room.id }};
   var statusPoll = null;
 
-  // ── 읽음 상태 관리 (localStorage, 수동 토글) ──────────────
-  var READ_KEY = 'kakao_read_' + ROOM_ID;
-  var currentDate = null;  // 현재 열려있는 날짜
+  // ── 캘린더 관리 ──────────────
+  var calendarPicker = null;
+  var summaryDatesData = {};  // { '2026-03-01': { has_summary: true, is_read: false } }
 
-  function getReadDates() {
-    try { return JSON.parse(localStorage.getItem(READ_KEY) || '[]'); } catch(e) { return []; }
+  // 날짜 뷰 토글 (캘린더/리스트)
+  function toggleDateView(view) {
+    var calendarView = document.getElementById('calendar-view');
+    var listView = document.getElementById('list-view');
+    var btnCalendar = document.getElementById('view-toggle-calendar');
+    var btnList = document.getElementById('view-toggle-list');
+
+    if (view === 'calendar') {
+      calendarView.classList.remove('hidden');
+      listView.classList.add('hidden');
+      btnCalendar.className = 'text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-yellow-100 text-yellow-800';
+      btnList.className = 'text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200';
+    } else {
+      calendarView.classList.add('hidden');
+      listView.classList.remove('hidden');
+      btnCalendar.className = 'text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200';
+      btnList.className = 'text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-yellow-100 text-yellow-800';
+    }
   }
 
-  function isRead(dateStr) {
-    return getReadDates().indexOf(dateStr) !== -1;
+  // 캘린더 초기화
+  function initCalendar() {
+    var datesInfo = {{ dates_info | tojson }};
+    
+    // dates_info를 summaryDatesData로 변환
+    datesInfo.forEach(function(item) {
+      summaryDatesData[item.date] = {
+        has_summary: item.has_summary,
+        is_read: item.is_read
+      };
+    });
+
+    // 모든 날짜 목록
+    var allDates = datesInfo.map(function(item) { return item.date; });
+    var minDate = allDates.length > 0 ? allDates[allDates.length - 1] : new Date().toISOString().split('T')[0];
+    var maxDate = allDates.length > 0 ? allDates[0] : new Date().toISOString().split('T')[0];
+
+    calendarPicker = flatpickr('#summary-calendar', {
+      locale: 'ko',
+      dateFormat: 'Y-m-d',
+      minDate: minDate,
+      maxDate: maxDate,
+      inline: true,
+      defaultDate: null,
+      onDayCreate: function(dObj, dStr, fp, dayElem) {
+        var dateStr = formatDate(dayElem.dateObj);
+        var data = summaryDatesData[dateStr];
+
+        if (data) {
+          // 요약이 있는 날짜
+          if (data.has_summary) {
+            dayElem.innerHTML += '<div class="w-1.5 h-1.5 rounded-full mx-auto mt-0.5" style="background:#FEE500;"></div>';
+            if (!data.is_read) {
+              // 안읽음 표시
+              dayElem.innerHTML += '<div class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-red-500"></div>';
+            }
+          }
+        }
+      },
+      onChange: function(selectedDates, dateStr, instance) {
+        if (dateStr && summaryDatesData[dateStr] && summaryDatesData[dateStr].has_summary) {
+          loadSummary({{ room.id }}, dateStr);
+        } else {
+          showFlash(dateStr + '에는 요약이 없습니다.', 'warning');
+        }
+      }
+    });
   }
 
-  function setRead(dateStr, read) {
-    var dates = getReadDates();
-    var idx = dates.indexOf(dateStr);
-    if (read && idx === -1) dates.push(dateStr);
-    if (!read && idx !== -1) dates.splice(idx, 1);
-    localStorage.setItem(READ_KEY, JSON.stringify(dates));
-    applyReadStyle(dateStr, read);
-    updateReadToggleBtn(dateStr);
+  function formatDate(dateObj) {
+    var y = dateObj.getFullYear();
+    var m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    var d = String(dateObj.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
   }
 
-  function toggleRead() {
+  // ── 캘린더 관리 ──────────────
+  var calendarPicker = null;
+  var summaryDatesData = {};
+
+  function toggleCalendarPopup() {
+    var popup = document.getElementById("calendar-popup");
+    popup.classList.toggle("hidden");
+  }
+
+  function initCalendar() {
+    var datesInfo = {{ dates_info | tojson }};
+    datesInfo.forEach(function(item) {
+      summaryDatesData[item.date] = {
+        has_summary: item.has_summary,
+        is_read: item.is_read
+      };
+    });
+
+    var allDates = datesInfo.map(function(item) { return item.date; });
+    var minDate = allDates.length > 0 ? allDates[allDates.length - 1] : new Date().toISOString().split("T")[0];
+    var maxDate = allDates.length > 0 ? allDates[0] : new Date().toISOString().split("T")[0];
+
+    calendarPicker = flatpickr("#summary-calendar", {
+      locale: "ko",
+      dateFormat: "Y-m-d",
+      minDate: minDate,
+      maxDate: maxDate,
+      inline: true,
+      defaultDate: null,
+      onDayCreate: function(dObj, dStr, fp, dayElem) {
+        var dateStr = formatDate(dayElem.dateObj);
+        var data = summaryDatesData[dateStr];
+
+        if (data && data.has_summary) {
+          // 요약이 있는 날짜: 읽음/안읽음 dot 표시 (가운데)
+          var dotColor = data.is_read ? "bg-green-500" : "bg-red-500";
+          dayElem.innerHTML += '<div class="flex justify-center mt-1"><div class="w-1.5 h-1.5 rounded-full ' + dotColor + '"></div></div>';
+        } else {
+          // 요약이 없는 날짜는 비활성화
+          dayElem.classList.add("flatpickr-disabled");
+          dayElem.style.color = "#D1D5DB";
+          dayElem.style.cursor = "not-allowed";
+        }
+      },
+      onChange: function(selectedDates, dateStr, instance) {
+        if (dateStr && summaryDatesData[dateStr] && summaryDatesData[dateStr].has_summary) {
+          toggleCalendarPopup();
+          loadSummary({{ room.id }}, dateStr);
+        }
+      }
+    });
+  }
+
+  function formatDate(dateObj) {
+    var y = dateObj.getFullYear();
+    var m = String(dateObj.getMonth() + 1).padStart(2, "0");
+    var d = String(dateObj.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+  }
+
+  // ── 읽음 상태 관리 (DB API) ──────────────
+  var currentDate = null;
+
+  async function isRead(dateStr) {
+    try {
+      var res = await fetch('/api/rooms/' + ROOM_ID + '/summaries/' + dateStr + '/read-status');
+      if (res.ok) {
+        var data = await res.json();
+        return data.is_read === true;
+      }
+    } catch(e) {}
+    return false;
+  }
+
+  async function setRead(dateStr, read) {
+    try {
+      var res = await fetch('/api/rooms/' + ROOM_ID + '/summaries/' + dateStr + '/read', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({is_read: read})
+      });
+      if (res.ok) {
+        applyReadStyle(dateStr, read);
+        await updateReadToggleBtn(dateStr);
+        
+        // 최근 요약 버튼의 data-read-status 속성도 업데이트
+        var recentBtn = document.querySelector('.recent-summary-btn[data-date="' + dateStr + '"]');
+        if (recentBtn) {
+          recentBtn.dataset.readStatus = read ? '1' : '0';
+        }
+        updateRecentSummariesReadState();
+      }
+    } catch(e) {}
+  }
+
+  async function toggleRead() {
+    console.log('[toggleRead] clicked, currentDate:', currentDate);
+    if (!currentDate) {
+      console.log('[toggleRead] currentDate is null, return');
+      return;
+    }
+    var read = await isRead(currentDate);
+    console.log('[toggleRead] current read status:', read);
+    await setRead(currentDate, !read);
+    console.log('[toggleRead] setRead completed');
+  }
+
+  async function deleteSummary() {
     if (!currentDate) return;
-    setRead(currentDate, !isRead(currentDate));
+    if (!confirm(currentDate + '의 모든 데이터(원본 메시지 + 요약)를 삭제하시겠습니까?\n\n⚠️ 원본 메시지도 함께 삭제되며 복구할 수 없습니다.')) return;
+    
+    try {
+      var res = await fetch('/api/rooms/' + ROOM_ID + '/summaries/' + currentDate, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        var data = await res.json();
+        showFlash(currentDate + ' 데이터 ' + data.messages_deleted + '개 메시지 삭제 완료', 'success');
+        // 사이드바에서 해당 날짜 완전히 제거
+        var sideBtn = document.getElementById('date-btn-' + currentDate);
+        if (sideBtn) {
+          sideBtn.remove();
+        }
+        // 모바일 select에서도 제거
+        var mobileOpt = document.getElementById('date-opt-' + currentDate);
+        if (mobileOpt) {
+          mobileOpt.remove();
+        }
+        // 요약 내용 비우기
+        document.getElementById('summary-content').innerHTML = 
+          '<div class="text-center py-16 text-gray-300">' +
+          '<div class="text-4xl mb-3">🗑️</div>' +
+          '<p class="text-sm font-semibold text-gray-500">' + currentDate + '</p>' +
+          '<p class="text-xs text-gray-400 mt-2">모든 데이터가 삭제되었습니다</p>' +
+          '</div>';
+        // 버튼 숨기기
+        document.getElementById('delete-summary-btn').classList.add('hidden');
+        document.getElementById('read-toggle-btn').classList.add('hidden');
+        document.getElementById('hide-date-btn').classList.add('hidden');
+        
+        // 페이지 새로고침하여 dates_info 갱신
+        setTimeout(function() { location.reload(); }, 1500);
+      } else {
+        var data = await res.json();
+        showFlash(data.detail || '삭제 실패', 'error');
+      }
+    } catch(e) {
+      showFlash('삭제 중 오류가 발생했습니다.', 'error');
+    }
+  }
+
+  async function hideDate() {
+    if (!currentDate) return;
+    if (!confirm(currentDate + ' 날짜를 숨기시겠습니까?\n\n데이터는 유지되며, 날짜별 요약 목록에서만 보이지 않게 됩니다.')) return;
+    
+    try {
+      var res = await fetch('/api/rooms/' + ROOM_ID + '/dates/' + currentDate + '/hidden', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({hidden: true})
+      });
+      if (res.ok) {
+        showFlash(currentDate + ' 날짜가 숨겨졌습니다', 'success');
+        // 사이드바에서 해당 날짜 제거
+        var sideBtn = document.getElementById('date-btn-' + currentDate);
+        if (sideBtn) sideBtn.remove();
+        // 모바일 select에서도 제거
+        var mobileOpt = document.getElementById('date-opt-' + currentDate);
+        if (mobileOpt) mobileOpt.remove();
+        // 내용 비우기
+        document.getElementById('summary-content').innerHTML = 
+          '<div class="text-center py-16 text-gray-300">' +
+          '<div class="text-4xl mb-3">👁️</div>' +
+          '<p class="text-sm font-semibold text-gray-500">' + currentDate + '</p>' +
+          '<p class="text-xs text-gray-400 mt-2">숨겨진 날짜입니다</p>' +
+          '</div>';
+        document.getElementById('hide-date-btn').classList.add('hidden');
+      } else {
+        var data = await res.json();
+        showFlash(data.detail || '숨기기 실패', 'error');
+      }
+    } catch(e) {
+      showFlash('숨기기 중 오류가 발생했습니다.', 'error');
+    }
   }
 
   function applyReadStyle(dateStr, read) {
@@ -358,16 +630,15 @@
     // 모바일 select option
     var opt = document.getElementById('date-opt-' + dateStr);
     if (opt) {
-      // 최초 1회 원본 텍스트 저장
       if (!opt.dataset.base) opt.dataset.base = opt.textContent.trim();
-      opt.textContent = read ? opt.dataset.base + ' (read)' : opt.dataset.base;
+      opt.textContent = read ? opt.dataset.base + ' (읽음)' : opt.dataset.base;
     }
   }
 
-  function updateReadToggleBtn(dateStr) {
+  async function updateReadToggleBtn(dateStr) {
     var btn = document.getElementById('read-toggle-btn');
     if (!btn || !dateStr) return;
-    var read = isRead(dateStr);
+    var read = await isRead(dateStr);
     btn.textContent = read ? '읽음 취소' : '읽음 표시';
     btn.className = read
       ? 'flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium border-gray-300 text-gray-400 hover:border-red-300 hover:text-red-400'
@@ -375,8 +646,39 @@
   }
 
   function initReadStates() {
-    getReadDates().forEach(function(d) { applyReadStyle(d, true); });
+    // data-read-status 속성에서 읽음 상태 읽어서 적용
+    document.querySelectorAll('[id^="date-btn-"]').forEach(function(btn) {
+      var dateStr = btn.id.replace('date-btn-', '');
+      var readStatus = btn.dataset.readStatus;
+      if (readStatus === '1' || readStatus === '0') {
+        var read = readStatus === '1';
+        applyReadStyle(dateStr, read);
+      }
+    });
+    
+    // 최근 요약 업데이트
+    updateRecentSummariesReadState();
   }
+
+  // 최근 요약 읽음 상태 업데이트 (서버 데이터 기반)
+  function updateRecentSummariesReadState() {
+    var btns = document.querySelectorAll('.recent-summary-btn');
+    for (var i = 0; i < btns.length; i++) {
+      var btn = btns[i];
+      var badge = btn.querySelector('.read-status-badge');
+      if (!badge) continue;
+      var readStatus = btn.dataset.readStatus;
+      var read = readStatus === '1';
+      if (read) {
+        badge.textContent = '';
+        btn.style.opacity = '0.6';
+      } else {
+        badge.innerHTML = '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">안읽음</span>';
+        btn.style.opacity = '1';
+      }
+    }
+  }
+
 
   // Tab switching
   function switchTab(tabId) {
@@ -432,15 +734,25 @@
           '<p class="text-sm text-gray-400">해당 날짜의 요약이 없습니다</p>' +
           '<button onclick="switchTab(\'generate\')" class="mt-4 text-xs font-semibold px-4 py-2 rounded-lg text-gray-900" style="background:#FEE500;">요약 생성</button>' +
           '</div>';
+        // 숨기기 버튼 표시 (요약 없는 날짜)
+        document.getElementById('hide-date-btn').classList.remove('hidden');
+        document.getElementById('delete-summary-btn').classList.add('hidden');
+        document.getElementById('read-toggle-btn').classList.add('hidden');
         return;
       }
       var data = await res.json();
       content.innerHTML = marked.parse(data.content || '');
-      // 읽음 버튼 표시
+      // 읽음 버튼, 삭제 버튼 표시
+      var deleteBtn = document.getElementById('delete-summary-btn');
       if (readBtn) {
         readBtn.classList.remove('hidden');
-        updateReadToggleBtn(dateStr);
+        await updateReadToggleBtn(dateStr);
       }
+      if (deleteBtn) {
+        deleteBtn.classList.remove('hidden');
+      }
+      // 숨기기 버튼 숨김 (요약 있는 날짜는 숨기기 불필요)
+      document.getElementById('hide-date-btn').classList.add('hidden');
     } catch(e) {
       content.innerHTML = '<p class="text-red-400 text-sm py-8 text-center">오류가 발생했습니다.</p>';
     }
@@ -511,15 +823,41 @@
   async function startSummarize(roomId) {
     var provider  = document.getElementById('llm-provider').value;
     var dateRange = document.getElementById('date-range').value;
-    var skipExist = document.getElementById('skip-existing').checked;
+    var skipExist = document.getElementById('skip-existing') ? document.getElementById('skip-existing').checked : false;
+    
+    // 날짜 직접 선택인 경우 체크된 날짜 수집
+    var selectedDates = [];
+    if (dateRange === 'custom') {
+      var checkboxes = document.querySelectorAll('#custom-dates-list input[type="checkbox"]:checked');
+      if (checkboxes.length === 0) {
+        showFlash('최소 하나 이상의 날짜를 선택하세요', 'warning');
+        return;
+      }
+      checkboxes.forEach(function(cb) { selectedDates.push(cb.value); });
+    }
+    
+    var confirmMsg = '요약을 시작하시겠습니까?\n';
+    if (dateRange === 'pending') {
+      confirmMsg += '• 대상: 요약이 필요한 날짜만';
+    } else if (dateRange === 'custom') {
+      confirmMsg += '• 대상: ' + selectedDates.length + '일 선택됨';
+    }
+    
+    if (!confirm(confirmMsg)) return;
+    
     var btn = document.getElementById('start-summarize-btn');
     btn.disabled = true; btn.classList.add('opacity-60');
 
     try {
+      var requestBody = { provider: provider, date_range: dateRange, skip_existing: skipExist };
+      if (dateRange === 'custom') {
+        requestBody.custom_dates = selectedDates;
+      }
+      
       var res = await fetch('/api/rooms/' + roomId + '/summarize', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ provider: provider, date_range: dateRange, skip_existing: skipExist }),
+        body: JSON.stringify(requestBody),
       });
       var data = await res.json();
       if (!res.ok) { showFlash(data.detail || '요약 시작 실패', 'error'); btn.disabled = false; btn.classList.remove('opacity-60'); return; }
@@ -532,6 +870,85 @@
       showFlash('요약 시작 중 오류가 발생했습니다', 'error');
       btn.disabled = false; btn.classList.remove('opacity-60');
     }
+  }
+
+  function toggleSkipExisting() {
+    var dateRange = document.getElementById('date-range').value;
+    var customArea = document.getElementById('custom-dates-area');
+    
+    if (dateRange === 'custom') {
+      customArea.classList.remove('hidden');
+      loadCustomDatesList('all');
+    } else {
+      customArea.classList.add('hidden');
+    }
+  }
+
+  var customTabFilter = 'all';
+
+  function switchCustomTab(tab) {
+    customTabFilter = tab;
+    // 탭 UI 업데이트
+    ['all', 'summarized', 'pending'].forEach(function(t) {
+      var btn = document.getElementById('custom-tab-' + t);
+      if (t === tab) {
+        btn.className = 'px-3 py-1.5 text-xs font-medium border-b-2 border-yellow-400 text-gray-900 transition-colors';
+      } else {
+        btn.className = 'px-3 py-1.5 text-xs font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-700 transition-colors';
+      }
+    });
+    loadCustomDatesList(tab);
+  }
+
+  var selectAllState = false;
+
+  function toggleSelectAll() {
+    selectAllState = !selectAllState;
+    var container = document.getElementById('custom-dates-list');
+    var checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(function(cb) { cb.checked = selectAllState; });
+    var btn = document.getElementById('select-all-btn');
+    btn.textContent = selectAllState ? '선택해제' : '전체선택';
+  }
+
+  function loadCustomDatesList(filter) {
+    filter = filter || customTabFilter;
+    selectAllState = false;
+    var btn = document.getElementById('select-all-btn');
+    if (btn) btn.textContent = '전체선택';
+    var container = document.getElementById('custom-dates-list');
+    var datesInfo = {{ dates_info | tojson }};
+    
+    if (datesInfo.length === 0) {
+      container.innerHTML = '<div class="text-sm text-gray-400 text-center py-4">데이터가 없습니다</div>';
+      return;
+    }
+    
+    // 필터링
+    var filtered = datesInfo;
+    if (filter === 'summarized') {
+      filtered = datesInfo.filter(function(item) { return item.has_summary; });
+    } else if (filter === 'pending') {
+      filtered = datesInfo.filter(function(item) { return !item.has_summary; });
+    }
+
+    if (filtered.length === 0) {
+      var msg = filter === 'summarized' ? '요약된 날짜가 없습니다' : (filter === 'pending' ? '미요약 날짜가 없습니다' : '데이터가 없습니다');
+      container.innerHTML = '<div class="text-sm text-gray-400 text-center py-4">' + msg + '</div>';
+      return;
+    }
+    
+    container.innerHTML = filtered.map(function(item) {
+      var checked = item.has_summary ? '' : 'checked';
+      var statusBadge = item.has_summary
+        ? '<span class="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-600">요약됨</span>'
+        : '<span class="text-xs px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-500">미요약</span>';
+      return '<label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">' +
+        '<input type="checkbox" value="' + item.date + '" ' + checked + ' data-has-summary="' + item.has_summary + '" class="w-4 h-4 rounded border-gray-300 accent-yellow-400">' +
+        '<span class="text-sm text-gray-700">' + item.date + '</span>' +
+        statusBadge +
+        '</label>';
+    }).join('');
   }
 
   async function cancelSummarize(roomId) {
@@ -598,11 +1015,31 @@
     }
   }
 
-  // 페이지 로드 시 읽음 상태 복원
-  initReadStates();
+  async function deleteRoom(roomId, roomName) {
+    if (!confirm("'" + roomName + "' 채팅방을 삭제할까요?\n\n⚠️ 모든 데이터(메시지, 요약, URL)가 삭제되며 복구할 수 없습니다.")) return;
+    try {
+      var res = await fetch('/api/rooms/' + roomId, { method: 'DELETE' });
+      var data = await res.json();
+      if (res.ok) {
+        showFlash("'" + roomName + "' 채팅방이 삭제되었습니다.", 'success');
+        setTimeout(function() { window.location.href = '/'; }, 800);
+      } else {
+        showFlash(data.detail || '삭제 실패', 'error');
+      }
+    } catch(e) { showFlash('삭제 중 오류가 발생했습니다.', 'error'); }
+  }
 
   // On load: check if summarize is already running
   (async function() {
+    // 읽음 상태 초기화
+    initReadStates();
+    
+    // 캘린더 초기화
+    if (typeof initCalendar === "function") {
+      initCalendar();
+    }
+    
+    // check if summarize is already running
     try {
       var res = await fetch('/api/rooms/' + ROOM_ID + '/summarize/status');
       var data = await res.json();

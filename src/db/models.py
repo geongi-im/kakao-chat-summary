@@ -16,7 +16,7 @@ class ChatRoom(Base):
     file_path = Column(String(512))
     participant_count = Column(Integer, default=0)
     last_sync_at = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=lambda: datetime.now())
     
     # Relationships
     messages = relationship("Message", back_populates="room", cascade="all, delete-orphan")
@@ -39,7 +39,8 @@ class Message(Base):
     message_date = Column(Date, nullable=False)
     message_time = Column(Time)
     raw_line = Column(Text)  # 원본 라인 저장
-    created_at = Column(DateTime, default=datetime.now)
+    is_hidden = Column(Integer, default=0)  # 0: 표시, 1: 숨김
+    created_at = Column(DateTime, default=lambda: datetime.now())
     
     # Unique constraint to prevent duplicates
     __table_args__ = (
@@ -65,7 +66,8 @@ class Summary(Base):
     content = Column(Text)
     llm_provider = Column(String(100))
     token_count = Column(Integer)
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=lambda: datetime.now())
+    is_read = Column(Integer, default=0)  # 0: 안읽음, 1: 읽음
     
     # Relationships
     room = relationship("ChatRoom", back_populates="summaries")
@@ -84,7 +86,7 @@ class SyncLog(Base):
     message_count = Column(Integer, default=0)
     new_message_count = Column(Integer, default=0)
     error_message = Column(Text)
-    synced_at = Column(DateTime, default=datetime.now)
+    synced_at = Column(DateTime, default=lambda: datetime.now())
     
     # Relationships
     room = relationship("ChatRoom", back_populates="sync_logs")
@@ -102,8 +104,8 @@ class URL(Base):
     url = Column(Text, nullable=False)
     descriptions = Column(Text)  # JSON 또는 " / " 구분 문자열
     source_date = Column(Date)  # URL이 발견된 요약 날짜
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=lambda: datetime.now())
+    updated_at = Column(DateTime, default=lambda: datetime.now(), onupdate=lambda: datetime.now())
     
     # Unique constraint
     __table_args__ = (

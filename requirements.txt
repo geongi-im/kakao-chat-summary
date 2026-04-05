@@ -2,7 +2,7 @@
 requests>=2.31.0
 python-dotenv>=1.0.0
 
-# UI
+# UI (GUI only — not needed for web deployment)
 PySide6>=6.6.0
 
 # Web (FastAPI)

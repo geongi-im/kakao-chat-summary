@@ -36,7 +36,7 @@ class LLMClient:
         if provider:
             config.set_provider(provider)
         
-        self.provider_info = config.get_provider_info()
+        self.provider_info = config.get_provider_info(provider or config.current_provider)
         self.api_key = config.get_api_key()
         self.logger = config.logger
         

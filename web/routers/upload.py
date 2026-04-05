@@ -1,10 +1,16 @@
 """파일 업로드 API."""
+import logging
 import re
 import tempfile
 from datetime import datetime, date as date_type, time as time_type
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+
+from db.database import get_db
+from file_storage import get_storage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -46,15 +52,13 @@ async def upload_file(
     room_name: str = Form(...),
     create_room: bool = Form(default=True),
 ):
-    from db.database import Database
-    from file_storage import FileStorage
     from parser import KakaoLogParser
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="파일이 없습니다.")
 
-    db = Database()
-    storage = FileStorage()
+    db = get_db()
+    storage = get_storage()
     parser = KakaoLogParser()
 
     # 채팅방 조회 또는 생성
@@ -120,7 +124,7 @@ async def upload_file(
             try:
                 new_messages += db.add_messages(room.id, msg_dicts)
             except Exception:
-                pass
+                logger.warning("Failed to add messages for room=%s date=%s", room.id, date_str, exc_info=True)
 
     # 동기화 로그
     try:
@@ -132,7 +136,7 @@ async def upload_file(
             new_message_count=new_messages,
         )
     except Exception:
-        pass
+        logger.warning("Failed to log sync for room=%s", room.id, exc_info=True)
 
     return {
         "success": True,

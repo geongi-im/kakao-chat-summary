@@ -1,17 +1,19 @@
 """채팅방 CRUD API."""
 from fastapi import APIRouter, HTTPException, Form
 
+from db.database import get_db
+
 router = APIRouter()
 
 
 @router.get("")
 async def list_rooms():
-    from db.database import Database
-    db = Database()
-    rooms = db.get_all_rooms()
+    db = get_db()
+    rooms_with_stats = db.get_all_rooms_with_stats()
     result = []
-    for room in rooms:
-        stats = db.get_room_stats(room.id)
+    for rws in rooms_with_stats:
+        room = rws["room"]
+        stats = rws["stats"]
         result.append({
             "id": room.id,
             "name": room.name,
@@ -25,8 +27,7 @@ async def list_rooms():
 
 @router.post("", status_code=201)
 async def create_room(name: str = Form(...)):
-    from db.database import Database
-    db = Database()
+    db = get_db()
     existing = db.get_room_by_name(name)
     if existing:
         raise HTTPException(status_code=400, detail="같은 이름의 채팅방이 이미 존재합니다.")
@@ -36,14 +37,14 @@ async def create_room(name: str = Form(...)):
 
 @router.get("/{room_id}")
 async def get_room(room_id: int):
-    from db.database import Database
-    from file_storage import FileStorage
-    db = Database()
+    from file_storage import get_storage
+
+    db = get_db()
     room = db.get_room_by_id(room_id)
     if not room:
         raise HTTPException(status_code=404, detail="채팅방을 찾을 수 없습니다.")
     stats = db.get_room_stats(room_id)
-    storage = FileStorage()
+    storage = get_storage()
     available_dates = storage.get_available_dates(room.name)
     summarized_dates = storage.get_summarized_dates(room.name)
     return {
@@ -61,8 +62,7 @@ async def get_room(room_id: int):
 
 @router.delete("/{room_id}")
 async def delete_room(room_id: int):
-    from db.database import Database
-    db = Database()
+    db = get_db()
     room = db.get_room_by_id(room_id)
     if not room:
         raise HTTPException(status_code=404, detail="채팅방을 찾을 수 없습니다.")
